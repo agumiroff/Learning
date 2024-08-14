@@ -3,83 +3,104 @@ package main
 import "fmt"
 
 func main() {
-	deq := NewDequeue()
-	deq.PushFront(5)
-	deq.PushBack(3)
-	deq.PopBack()
-	deq.Print()
-}
+	d := NewDequeue(3, 3)
 
-type Node struct {
-	Data int
-	Next *Node
+	d.PushFront(2)
+	d.PushFront(5)
+	d.PushFront(3)
+	fmt.Println(d.Storage[1])
 }
 
 type Dequeue struct {
-	begin *Node
-	end   *Node
+	DSize       int
+	BSize       int
+	Storage     []*Bucket
+	FrontBucket Pointer
+	BackBucket  Pointer
 }
 
-func NewDequeue() Dequeue {
-	end := Node{
-		Data: 0,
-		Next: nil,
+type Bucket struct {
+	Capacity  int
+	FreeSpace int
+	Storage   []OptionalInt
+}
+
+type Pointer struct {
+	currBucket   int
+	lastValIndex int
+}
+
+type OptionalInt struct {
+	Value int
+	IsSet bool
+}
+
+func NewBucket(capacity int) *Bucket {
+	return &Bucket{
+		Capacity:  capacity,
+		FreeSpace: capacity,
+		Storage:   make([]OptionalInt, capacity),
 	}
+}
 
-	begin := Node{
-		Data: 0,
-		Next: &end,
+func NewDequeue(dsize int, bsize int) *Dequeue {
+	storage := make([]*Bucket, dsize)
+	isEven := dsize%2 == 0
+	frontBucketIndex := 0
+	backBucketIndex := 0
+	if isEven {
+		frontBucketIndex = dsize/2 - 1
+		backBucketIndex = dsize / 2
+	} else {
+		frontBucketIndex = dsize / 2
+		backBucketIndex = dsize / 2
 	}
-	return Dequeue{
-		begin: &begin,
-		end:   &end,
+	// TODO: Pointers on value
+	return &Dequeue{
+		BSize:   bsize,
+		DSize:   dsize,
+		Storage: storage,
+		FrontBucket: Pointer{
+			currBucket: frontBucketIndex,
+		},
+		BackBucket: Pointer{
+			currBucket: backBucketIndex,
+		},
 	}
 }
 
-func (deq *Dequeue) PushFront(data int) {
-	node := &Node{
-		Data: data,
-		Next: deq.begin,
+func (d *Dequeue) PushFront(val int) {
+	frontBucket := d.Storage[d.FrontBucket.currBucket]
+	value := OptionalInt{
+		Value: val,
+		IsSet: true,
 	}
-	deq.begin = node
-}
-
-func (deq *Dequeue) PushBack(data int) {
-	node := &Node{
-		Data: data,
-		Next: nil,
-	}
-	deq.end.Next = node
-	deq.end = node
-}
-
-func (deq *Dequeue) PopFront() int {
-	val := deq.begin.Data
-	deq.begin = deq.begin.Next
-	return val
-}
-
-func (deq *Dequeue) PopBack() int {
-	val := deq.end.Data
-	// finding prev node
-	prevNode := findPrevNode(deq.begin)
-	prevNode.Next = nil
-	deq.end = prevNode
-	return val
-}
-
-func findPrevNode(node *Node) *Node {
-	result := Node{}
-	for current := node; current != nil; current = current.Next {
-		if current.Next.Next == nil {
-			return current
+	if frontBucket == nil {
+		d.Storage[d.FrontBucket.currBucket] = NewBucket(d.BSize)
+		if d.FrontBucket.currBucket == d.DSize/2 {
+			d.FrontBucket.lastValIndex = d.BSize / 2
+		} else {
+			d.FrontBucket.lastValIndex = 0
 		}
-	}
-	return &result
-}
-
-func (deq *Dequeue) Print() {
-	for node := deq.begin; node != nil; node = node.Next {
-		fmt.Println(node.Data)
+		d.PushFront(val)
+	} else {
+		currIndex := d.FrontBucket.lastValIndex
+		if frontBucket.Storage[currIndex].IsSet {
+			if currIndex+1 < len(frontBucket.Storage) {
+				currIndex++
+				d.FrontBucket.lastValIndex++
+				frontBucket.Storage[currIndex] = value
+			} else {
+				if d.FrontBucket.currBucket+1 > len(d.Storage) {
+					fmt.Printf("No more buckets") // TODO: Add migration
+				} else {
+					d.FrontBucket.currBucket++
+					d.FrontBucket.lastValIndex = 0
+					d.PushFront(val)
+				}
+			}
+		} else {
+			frontBucket.Storage[currIndex] = value
+		}
 	}
 }
